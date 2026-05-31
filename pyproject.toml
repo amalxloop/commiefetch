@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [
     {name = "commiefetch contributors"},
 ]
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.8"
 keywords = ["system-info", "neofetch", "communist", "fastfetch", "cli"]
 classifiers = [
@@ -28,8 +28,8 @@ classifiers = [
 commiefetch = "commiefetch.cli:main"
 
 [project.urls]
-Source = "https://github.com/anomalyco/commiefetch"
-Tracker = "https://github.com/anomalyco/commiefetch/issues"
+Source = "https://github.com/amalxloop/commiefetch"
+Tracker = "https://github.com/amalxloop/commiefetch/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
