@@ -134,4 +134,4 @@ modules = ["title", "os", "host", "kernel", "cpu", "memory"]
 
 ## License
 
-MIT — use it, share it, comrade.
+GPL V3 — use it, share it, comrade.
