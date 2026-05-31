@@ -1,0 +1,28 @@
+{
+  "logo": "ascii_hammer",
+  "theme": "soviet",
+  "separator": " -> ",
+  "color_separator": true,
+  "bold_labels": true,
+  "show_colors": true,
+  "padding": 2,
+  "title": null,
+  "modules": [
+    "title",
+    "os",
+    "host",
+    "kernel",
+    "uptime",
+    "packages",
+    "shell",
+    "de",
+    "wm",
+    "terminal",
+    "cpu",
+    "gpu",
+    "memory",
+    "disk",
+    "battery",
+    "locale"
+  ]
+}

@@ -1,0 +1,23 @@
+# commiefetch configuration
+# Soviet-themed minimal config
+
+logo = "ussr"
+theme = "soviet"
+separator = " :: "
+color_separator = true
+bold_labels = true
+show_colors = true
+padding = 3
+
+modules = [
+    "title",
+    "os",
+    "host",
+    "kernel",
+    "uptime",
+    "packages",
+    "cpu",
+    "gpu",
+    "memory",
+    "disk",
+]

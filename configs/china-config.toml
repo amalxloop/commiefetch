@@ -1,0 +1,19 @@
+# PRC-themed configuration
+
+logo = "prc"
+theme = "china"
+separator = " -> "
+color_separator = true
+bold_labels = true
+padding = 2
+
+modules = [
+    "title",
+    "os",
+    "host",
+    "kernel",
+    "uptime",
+    "cpu",
+    "gpu",
+    "memory",
+]

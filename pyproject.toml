@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "commiefetch"
+version = "1.0.0"
+description = "Communist-themed system information tool — like neofetch, but red"
+readme = "README.md"
+authors = [
+    {name = "commiefetch contributors"},
+]
+license = {text = "MIT"}
+requires-python = ">=3.8"
+keywords = ["system-info", "neofetch", "communist", "fastfetch", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+
+[project.scripts]
+commiefetch = "commiefetch.cli:main"
+
+[project.urls]
+Source = "https://github.com/anomalyco/commiefetch"
+Tracker = "https://github.com/anomalyco/commiefetch/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+commiefetch = ["py.typed"]
