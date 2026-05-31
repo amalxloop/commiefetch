@@ -1,0 +1,28 @@
+# Maintainer: amalxloop <amalrockz568@gmail.com>
+
+pkgname=commiefetch-git
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Communist-themed system information tool — like neofetch, but red (git)"
+arch=('any')
+url="https://github.com/amalxloop/commiefetch"
+license=('MIT')
+depends=('python')
+makedepends=('git' 'python-build' 'python-installer' 'python-wheel' 'python-setuptools')
+source=("commiefetch::git+https://github.com/amalxloop/commiefetch.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/commiefetch"
+  git describe --long --tags 2>/dev/null | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' || echo "$pkgver.r0.$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd "$srcdir/commiefetch"
+  python -m build --wheel --no-sdist
+}
+
+package() {
+  cd "$srcdir/commiefetch"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+}

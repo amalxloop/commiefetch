@@ -1,4 +1,4 @@
-pkgbase = python-commiefetch
+pkgbase = commiefetch
 	pkgdesc = Communist-themed system information tool — like neofetch, but red
 	pkgver = 1.0.0
 	pkgrel = 1
@@ -10,9 +10,7 @@ pkgbase = python-commiefetch
 	makedepends = python-wheel
 	makedepends = python-setuptools
 	depends = python
-	provides = commiefetch
-	conflicts = commiefetch
 	source = commiefetch-1.0.0.tar.gz::https://files.pythonhosted.org/packages/source/c/commiefetch/commiefetch-1.0.0.tar.gz
 	sha256sums = 28a5437df3375c74f5b1ba5c46418cfd87bcf7a49b8feaf93f3238a1a93e53c0
 
-pkgname = python-commiefetch
+pkgname = commiefetch
