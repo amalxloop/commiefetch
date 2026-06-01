@@ -7,6 +7,7 @@ import shutil
 import socket
 import pwd
 import grp
+from pathlib import Path
 
 from .colors import NO_COLOR
 
@@ -611,13 +612,57 @@ def get_wm():
     system = platform.system()
     if system == "Linux":
         wm = os.environ.get("WINDOW_MANAGER") or ""
-        if not wm:
-            out = run_cmd(["wmctrl", "-m"], timeout=3)
-            if out:
-                for line in out.split("\n"):
-                    if "Name:" in line:
-                        return line.split(":")[-1].strip()
-        return wm or "unknown"
+        if wm:
+            return wm
+
+        out = run_cmd(["wmctrl", "-m"], timeout=3)
+        if out:
+            for line in out.split("\n"):
+                if "Name:" in line:
+                    return line.split(":")[-1].strip()
+
+        procs = run_cmd(["pgrep", "-l", "."], timeout=3)
+        if not procs:
+            try:
+                procs = ""
+                for f in Path("/proc").iterdir():
+                    if f.is_dir() and (f / "comm").exists():
+                        name = (f / "comm").read_text().strip()
+                        procs += name + "\n"
+            except Exception:
+                procs = ""
+
+        if procs:
+            proc_names = set()
+            for line in procs.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(None, 1)
+                if len(parts) == 2 and parts[0].isdigit():
+                    proc_names.add(parts[1])
+                else:
+                    proc_names.add(line)
+            wm_names = (
+                "i3", "sway", "hyprland", "bspwm", "dwm", "awesome",
+                "qtile", "xmonad", "herbstluftwm", "spectrwm", "ratpoison",
+                "stumpwm", "openbox", "fluxbox", "icewm", "fvwm", "fvwm2",
+                "fvwm3", "windowmaker", "afterstep", "enlightenment",
+                "blackbox", "pekwm", "sawfish", "twm", "cwm", "wm2",
+                "kwin_x11", "kwin_wayland", "weston", "river", "wayfire",
+                "niri", "labwc", "dwl", "hikari", "marco", "muffin",
+                "xfwm4", "budgie-wm", "deepin-wm", "compiz", "gnome-shell",
+            )
+            for name in wm_names:
+                if name in proc_names:
+                    return name
+
+        if os.environ.get("WAYLAND_DISPLAY"):
+            return "Wayland"
+        if os.environ.get("DISPLAY"):
+            return "X11"
+
+        return "unknown"
     return "unknown"
 
 
