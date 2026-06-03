@@ -461,12 +461,11 @@ def main():
 
     has_logo = logo_name and logo_name.lower() != "none"
 
-    if has_logo:
+    if has_logo and classic:
         logo_art = render_logo(logo_name, theme)
         info_lines = render_info(modules, theme, cfg)
 
         logo_lines = logo_art.split("\n")
-
         max_logo_width = max(len(line) for line in logo_lines)
 
         output_lines = []
@@ -475,11 +474,9 @@ def main():
         for i in range(max_lines):
             logo_line = logo_lines[i] if i < len(logo_lines) else ""
             info_line = info_lines[i] if i < len(info_lines) else ""
-
             if i == 0 and not info_line:
                 output_lines.append(logo_line)
                 continue
-
             if not info_line and logo_line:
                 output_lines.append(logo_line)
                 continue
@@ -487,7 +484,6 @@ def main():
                 pad_left = " " * (max_logo_width + padding)
                 output_lines.append(f"{pad_left}{info_line}")
                 continue
-
             if logo_line:
                 pad_to = max_logo_width - len(logo_line) + padding
                 if pad_to < 2:
@@ -498,6 +494,14 @@ def main():
 
         print()
         for line in output_lines:
+            print(line)
+        print()
+    elif has_logo:
+        logo_art = render_logo(logo_name, theme)
+        info_lines = render_compact(modules, theme, cfg)
+        print()
+        print(logo_art)
+        for line in info_lines:
             print(line)
         print()
     elif classic:

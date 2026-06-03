@@ -109,7 +109,7 @@ def parse_ini_config(path):
 
 def load_config(path=None):
     defaults = {
-        "logo": "none",
+        "logo": "ascii_hammer",
         "theme": DEFAULT_THEME,
         "modules": DEFAULT_MODULES[:],
         "separator": " -> ",
