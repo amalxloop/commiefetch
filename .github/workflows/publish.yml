@@ -1,16 +1,16 @@
-name: Publish to PyPI and GitHub Packages
+name: Build & Publish
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -22,8 +22,7 @@ jobs:
           python -m pip install --upgrade build twine
           python -m build
 
-      - name: Upload release assets
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
@@ -34,14 +33,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: twine upload dist/*
 
-      - name: Publish to GitHub Packages
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-          TWINE_REPOSITORY_URL: https://github.pkg.github.com/
-        run: twine upload dist/*
-
-  pypi-matrix:
+  pypi-test:
     needs: build
     strategy:
       matrix:
