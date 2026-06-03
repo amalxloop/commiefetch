@@ -27,6 +27,46 @@ from .modules import (
 )
 
 
+NERD_ICONS = {
+    "os": "󰌽",
+    "packages": "󰏖",
+    "wm": "󰨇",
+    "gpu": "󰍛",
+    "uptime": "󰅐",
+    "disk": "󰋊",
+    "memory": "󰟜",
+    "terminal": "󰙅",
+    "kernel": "󰧑",
+    "shell": "󰯉",
+    "cpu": None,
+}
+
+COMPACT_LABELS = {
+    "os": "os",
+    "host": "host",
+    "kernel": "kernel",
+    "uptime": "uptime",
+    "packages": "pkgs",
+    "shell": "shell",
+    "de": "de",
+    "wm": "wm",
+    "terminal": "term",
+    "cpu": "cpu",
+    "gpu": "gpu",
+    "memory": "ram",
+    "disk": "disk",
+    "disks": "disks",
+    "swap": "swap",
+    "battery": "battery",
+    "processes": "procs",
+    "local_ip": "local_ip",
+    "public_ip": "public_ip",
+    "resolution": "res",
+    "locale": "locale",
+    "cpu_temp": "temp",
+}
+
+
 def build_arg_parser():
     parser = argparse.ArgumentParser(
         prog=__app_name__,
@@ -41,6 +81,7 @@ def build_arg_parser():
               {__app_name__} --list-logos
               {__app_name__} --list-themes
               {__app_name__} --no-color
+              {__app_name__} --classic
               {__app_name__} --config ~/.config/commiefetch/config.json
               {__app_name__} --gen-config
 
@@ -108,6 +149,11 @@ def build_arg_parser():
         "--title",
         help="Custom title text",
         default=None,
+    )
+    parser.add_argument(
+        "--classic",
+        action="store_true",
+        help="Use classic output format (label -> value, with logo)",
     )
     return parser
 
@@ -283,6 +329,68 @@ def render_info(modules, theme, cfg):
     return lines
 
 
+def render_compact(modules, theme, cfg):
+    t = THEMES.get(theme, THEMES[DEFAULT_THEME])
+    accent = t["accent_color"]
+    label_color = t["label_color"]
+    value_color = t["value_color"]
+
+    out = []
+    user = get_user()
+    host = get_hostname()
+    title = cfg.get("title")
+    if title:
+        header = title
+    else:
+        header = f"{user}@{host}"
+
+    sep_char = "─"
+    line_width = max(len(header), 30)
+
+    if not NO_COLOR:
+        out.append(f"{BOLD}{accent}{header}{RESET}")
+        out.append(f"{DIM}{accent}{sep_char * line_width}{RESET}")
+    else:
+        out.append(header)
+        out.append(sep_char * line_width)
+
+    for mod in modules:
+        if mod in ("title", "user_at_host"):
+            continue
+        value = get_module_value(mod)
+        if value is None or value == "":
+            continue
+
+        label = COMPACT_LABELS.get(mod, mod.replace("_", " "))
+        icon = NERD_ICONS.get(mod, None)
+        arrow = "󰁔" if not NO_COLOR else "->"
+
+        if icon and not NO_COLOR:
+            label_part = f"{icon} {label}"
+        else:
+            label_part = label
+
+        if not NO_COLOR:
+            label_str = f"{label_color}{label_part}{RESET}"
+            arrow_str = f"{DIM}{accent}{arrow}{RESET}"
+            val_str = f"{value_color}{value}{RESET}"
+            line = f"{label_str} {arrow_str} {val_str}"
+        else:
+            line = f"{label_part} {arrow} {value}"
+
+        out.append(line)
+
+    if not NO_COLOR:
+        out.append(f"{DIM}{accent}{sep_char * line_width}{RESET}")
+        dots = "● ● ● ● ● ● ● ●"
+        out.append(f"{DIM}{accent}{dots}{RESET}")
+    else:
+        out.append(sep_char * line_width)
+        out.append("* * * * * * * *")
+
+    return out
+
+
 def main():
     parser = build_arg_parser()
     args = parser.parse_args()
@@ -338,54 +446,72 @@ def main():
         cfg["padding"] = args.padding
     if args.title:
         cfg["title"] = args.title
+    if args.classic:
+        cfg["classic"] = True
 
     logo_name = cfg.get("logo", "ussr")
     theme = cfg.get("theme", DEFAULT_THEME)
     modules = cfg.get("modules", DEFAULT_MODULES)
     padding = cfg.get("padding", 2)
+    classic = cfg.get("classic", False)
 
     if logo_name == "random":
         import random
         logo_name = random.choice(list(LOGOS.keys()))
 
-    logo_art = render_logo(logo_name, theme)
-    info_lines = render_info(modules, theme, cfg)
+    has_logo = logo_name and logo_name.lower() != "none"
 
-    logo_lines = logo_art.split("\n")
+    if has_logo:
+        logo_art = render_logo(logo_name, theme)
+        info_lines = render_info(modules, theme, cfg)
 
-    max_logo_width = max(len(line) for line in logo_lines)
+        logo_lines = logo_art.split("\n")
 
-    output_lines = []
-    max_lines = max(len(logo_lines), len(info_lines))
+        max_logo_width = max(len(line) for line in logo_lines)
 
-    for i in range(max_lines):
-        logo_line = logo_lines[i] if i < len(logo_lines) else ""
-        info_line = info_lines[i] if i < len(info_lines) else ""
+        output_lines = []
+        max_lines = max(len(logo_lines), len(info_lines))
 
-        if i == 0 and not info_line:
-            output_lines.append(logo_line)
-            continue
+        for i in range(max_lines):
+            logo_line = logo_lines[i] if i < len(logo_lines) else ""
+            info_line = info_lines[i] if i < len(info_lines) else ""
 
-        if not info_line and logo_line:
-            output_lines.append(logo_line)
-            continue
-        if not logo_line and info_line:
-            pad_left = " " * (max_logo_width + padding)
-            output_lines.append(f"{pad_left}{info_line}")
-            continue
+            if i == 0 and not info_line:
+                output_lines.append(logo_line)
+                continue
 
-        if logo_line:
-            pad_to = max_logo_width - len(logo_line) + padding
-            if pad_to < 2:
-                pad_to = 2
-            output_lines.append(f"{logo_line}{' ' * pad_to}{info_line}")
-        else:
-            output_lines.append(f"{' ' * (max_logo_width + padding)}{info_line}")
+            if not info_line and logo_line:
+                output_lines.append(logo_line)
+                continue
+            if not logo_line and info_line:
+                pad_left = " " * (max_logo_width + padding)
+                output_lines.append(f"{pad_left}{info_line}")
+                continue
 
-    print()
-    for line in output_lines:
-        print(line)
-    print()
+            if logo_line:
+                pad_to = max_logo_width - len(logo_line) + padding
+                if pad_to < 2:
+                    pad_to = 2
+                output_lines.append(f"{logo_line}{' ' * pad_to}{info_line}")
+            else:
+                output_lines.append(f"{' ' * (max_logo_width + padding)}{info_line}")
+
+        print()
+        for line in output_lines:
+            print(line)
+        print()
+    elif classic:
+        info_lines = render_info(modules, theme, cfg)
+        print()
+        for line in info_lines:
+            print(line)
+        print()
+    else:
+        lines = render_compact(modules, theme, cfg)
+        print()
+        for line in lines:
+            print(line)
+        print()
 
     return 0
 

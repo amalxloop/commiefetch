@@ -34,7 +34,7 @@ def parse_json_config(data):
     if isinstance(data, str):
         data = json.loads(data)
     cfg = {}
-    cfg["logo"] = data.get("logo", "ussr")
+    cfg["logo"] = data.get("logo", "none")
     cfg["theme"] = data.get("theme", DEFAULT_THEME)
     cfg["modules"] = data.get("modules", None)
     cfg["separator"] = data.get("separator", " -> ")
@@ -43,6 +43,7 @@ def parse_json_config(data):
     cfg["show_colors"] = data.get("show_colors", True)
     cfg["padding"] = data.get("padding", 2)
     cfg["title"] = data.get("title", None)
+    cfg["classic"] = data.get("classic", False)
     return cfg
 
 
@@ -102,12 +103,13 @@ def parse_ini_config(path):
     )
     cfg["padding"] = parser.getint("commiefetch", "padding", fallback=2)
     cfg["title"] = parser.get("commiefetch", "title", fallback=None)
+    cfg["classic"] = parser.getboolean("commiefetch", "classic", fallback=False)
     return cfg
 
 
 def load_config(path=None):
     defaults = {
-        "logo": "ascii_hammer",
+        "logo": "none",
         "theme": DEFAULT_THEME,
         "modules": DEFAULT_MODULES[:],
         "separator": " -> ",
@@ -116,6 +118,7 @@ def load_config(path=None):
         "show_colors": True,
         "padding": 2,
         "title": None,
+        "classic": False,
     }
     if path:
         config_path = path
@@ -167,6 +170,13 @@ def load_config(path=None):
                 parsed["padding"] = toml_data.get(
                     "padding", defaults["padding"]
                 )
+                parsed["classic"] = toml_data.get(
+                    "classic", defaults["classic"]
+                )
+                if main_section:
+                    parsed["classic"] = main_section.get(
+                        "classic", parsed["classic"]
+                    )
             else:
                 parsed = defaults
         elif ext == ".ini":
@@ -183,17 +193,13 @@ def load_config(path=None):
 
 def write_example_config(path):
     config = {
-        "logo": "ussr",
+        "logo": "none",
         "theme": "soviet",
-        "separator": " -> ",
-        "color_separator": True,
-        "bold_labels": True,
-        "show_colors": True,
-        "padding": 2,
+        "classic": False,
         "title": None,
         "modules": [
-            "title", "os", "host", "kernel", "uptime",
-            "packages", "shell", "de", "wm", "terminal",
+            "os", "kernel", "uptime",
+            "packages", "shell", "wm", "terminal",
             "cpu", "gpu", "memory", "disk", "battery",
         ],
     }
@@ -204,9 +210,9 @@ def write_example_config(path):
 
 
 DEFAULT_MODULES = [
-    "title", "os", "host", "kernel", "uptime", "packages",
-    "shell", "de", "terminal", "cpu", "gpu", "memory",
-    "disk", "locale",
+    "os", "kernel", "uptime", "packages",
+    "shell", "wm", "terminal", "cpu", "gpu", "memory",
+    "disk", "battery",
 ]
 
 
