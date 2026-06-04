@@ -11,6 +11,10 @@ from pathlib import Path
 
 from .colors import NO_COLOR
 
+
+def is_termux():
+    return bool(os.environ.get("TERMUX_VERSION")) or "/com.termux/" in __file__
+
 _cache = {}
 _cache_time = {}
 _cache_ttl = 5
@@ -52,7 +56,12 @@ def get_user():
 @cached("hostname", 3600)
 def get_hostname():
     try:
-        return socket.gethostname()
+        host = socket.gethostname()
+        if host in ("localhost", "localhost.localdomain", ""):
+            model = run_cmd(["getprop", "ro.product.model"], timeout=2)
+            if model:
+                return model.replace(" ", "-")
+        return host
     except Exception:
         return platform.node() or "unknown"
 
@@ -60,6 +69,8 @@ def get_hostname():
 @cached("os", 3600)
 def get_os():
     system = platform.system()
+    if is_termux():
+        return f"Termux {os.environ.get('TERMUX_VERSION', '?')} on Android"
     if system == "Linux":
         info = ""
         os_release = "/etc/os-release"
@@ -123,9 +134,30 @@ def get_kernel():
 @cached("uptime", 10)
 def get_uptime():
     try:
+        if is_termux():
+            out = run_cmd(["uptime"], timeout=3)
+            if out and "up" in out:
+                import re
+                m = re.search(r'up\s+(.+?)(?:,\s+\d+ users|,\s+load)', out)
+                if m:
+                    raw = m.group(1).strip()
+                    parts = []
+                    dm = re.search(r'(\d+)\s+days?', raw)
+                    hm = re.search(r'(\d+):(\d+)', raw)
+                    mm = re.search(r'(\d+)\s+min', raw)
+                    if dm: parts.append(f"{dm.group(1)}d")
+                    if hm:
+                        parts.append(f"{hm.group(1)}h")
+                        parts.append(f"{hm.group(2)}m")
+                    elif mm:
+                        parts.append(f"{mm.group(1)}m")
+                    return " ".join(parts) if parts else raw
         if platform.system() == "Linux":
-            with open("/proc/uptime") as f:
-                uptime_sec = float(f.read().split()[0])
+            try:
+                with open("/proc/uptime") as f:
+                    uptime_sec = float(f.read().split()[0])
+            except Exception:
+                return "unknown"
         elif platform.system() == "Darwin":
             out = run_cmd(["sysctl", "-n", "kern.boottime"])
             if out:
@@ -173,6 +205,22 @@ def get_uptime():
 def get_cpu():
     try:
         system = platform.system()
+        if is_termux() or (system == "Linux" and not os.path.exists("/proc/cpuinfo")):
+            name = run_cmd(["getprop", "ro.soc.model"], timeout=2)
+            if not name:
+                name = run_cmd(["getprop", "ro.chipname"], timeout=2)
+            if not name:
+                name = run_cmd(["getprop", "ro.board.platform"], timeout=2)
+            cores = os.cpu_count() or 0
+            if name:
+                return f"{name} ({cores} cores)"
+            out = run_cmd(["cat", "/proc/cpuinfo"], timeout=3)
+            if out:
+                for line in out.split("\n"):
+                    if line.startswith("model name") or line.startswith("Hardware"):
+                        name = line.split(":", 1)[1].strip()
+                        return f"{name} ({cores} cores)"
+            return f"Unknown ARM ({cores} cores)"
         if system == "Linux":
             with open("/proc/cpuinfo") as f:
                 for line in f:
@@ -217,7 +265,11 @@ def get_cpu():
 def get_gpu():
     try:
         system = platform.system()
-        if system == "Linux":
+        if is_termux() or system == "Linux":
+            if is_termux():
+                renderer = run_cmd(["getprop", "ro.product.board"], timeout=2)
+                if renderer:
+                    return f"{renderer} (Android GPU)"
             out = run_cmd(
                 ["lspci"], timeout=5
             )
@@ -490,6 +542,8 @@ def get_disks():
 @cached("terminal", 3600)
 def get_terminal():
     terms = os.environ.get("TERM_PROGRAM") or os.environ.get("TERM")
+    if not terms and is_termux():
+        terms = "Termux"
     return terms or "unknown"
 
 
@@ -501,6 +555,8 @@ def get_shell():
 @cached("desktop", 3600)
 def get_desktop():
     system = platform.system()
+    if is_termux():
+        return "Android (Termux)"
     if system == "Linux":
         de = os.environ.get("XDG_CURRENT_DESKTOP") or \
              os.environ.get("DESKTOP_SESSION") or \
@@ -566,6 +622,19 @@ def get_packages():
 def get_resolution():
     try:
         system = platform.system()
+        if is_termux():
+            out = run_cmd(["wm", "size"], timeout=3)
+            if out:
+                import re
+                m = re.search(r'(\d+x\d+)', out)
+                if m:
+                    return m.group(1)
+            out = run_cmd(["getprop", "ro.sf.lcd_density"], timeout=2)
+            if out:
+                phys = run_cmd(["getprop", "persist.sys.physicaldisplay.dimensions"], timeout=2)
+                if phys:
+                    return phys
+            return "unknown"
         if system == "Linux":
             out = run_cmd(["xrandr"], timeout=5)
             if out:
@@ -610,6 +679,8 @@ def get_de():
 @cached("wm", 3600)
 def get_wm():
     system = platform.system()
+    if is_termux():
+        return "N/A (Android)"
     if system == "Linux":
         wm = os.environ.get("WINDOW_MANAGER") or ""
         if wm:
@@ -739,6 +810,19 @@ def get_public_ip():
 def get_battery():
     try:
         system = platform.system()
+        if is_termux():
+            out = run_cmd(["termux-battery-status"], timeout=5)
+            if out:
+                import json
+                try:
+                    data = json.loads(out)
+                    pct = data.get("percentage", "?")
+                    plug = data.get("plugged", "")
+                    status = data.get("status", "")
+                    plug_str = f" ({plug})" if plug else ""
+                    return f"{pct}%{plug_str}"
+                except Exception:
+                    pass
         if system == "Linux":
             power = "/sys/class/power_supply"
             if os.path.exists(power):
