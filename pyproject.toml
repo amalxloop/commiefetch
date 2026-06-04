@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [
     {name = "commiefetch contributors"},
 ]
-license = "MIT"
+license = "GPL-3.0-only"
 requires-python = ">=3.8"
 keywords = ["system-info", "neofetch", "communist", "fastfetch", "cli"]
 classifiers = [
