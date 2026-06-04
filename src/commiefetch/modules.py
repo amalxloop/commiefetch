@@ -13,7 +13,15 @@ from .colors import NO_COLOR
 
 
 def is_termux():
-    return bool(os.environ.get("TERMUX_VERSION")) or "/com.termux/" in __file__
+    if bool(os.environ.get("TERMUX_VERSION")):
+        return True
+    if "/com.termux/" in __file__:
+        return True
+    if os.environ.get("PREFIX", "").startswith("/data/data/com.termux"):
+        return True
+    if os.path.exists("/data/data/com.termux/files/usr/bin/termux-setup-package"):
+        return True
+    return False
 
 _cache = {}
 _cache_time = {}
@@ -465,6 +473,22 @@ def get_disk(path="/"):
             "percent": round(used / total * 100, 1) if total else 0,
         }
     except Exception:
+        if is_termux() and path == "/":
+            out = run_cmd(["df", "-m", "/"], timeout=5)
+            if out:
+                for line in out.split("\n"):
+                    parts = line.split()
+                    if len(parts) >= 6 and parts[0] == "/":
+                        total = int(parts[1])
+                        used = int(parts[2])
+                        return {
+                            "total": total,
+                            "used": used,
+                            "free": total - used,
+                            "unit": "MiB",
+                            "mount": "/",
+                            "percent": round(used / total * 100, 1) if total else 0,
+                        }
         return None
 
 
@@ -487,6 +511,14 @@ def get_disks():
                                     "mount": mount,
                                     "info": info,
                                 })
+            if not disks and is_termux():
+                root = get_disk("/")
+                if root and root["total"] >= 1024:
+                    disks.append({
+                        "device": "rootfs",
+                        "mount": "/",
+                        "info": root,
+                    })
             return disks[:4]
         except Exception:
             pass
@@ -578,6 +610,15 @@ def get_desktop():
 def get_packages():
     system = platform.system()
     count = 0
+    if is_termux():
+        out = run_cmd(["dpkg", "--list"], timeout=5)
+        if out:
+            count = len([l for l in out.split("\n") if l.startswith("ii")])
+        if not count:
+            out = run_cmd(["apt", "list", "--installed", "2>/dev/null"], timeout=5)
+            if out:
+                count = len([l for l in out.split("\n") if "/" in l])
+        return count or 0
     if system == "Linux":
         methods = [
             (["dpkg", "--list"], lambda l: len(l.split("\n")) - 5),

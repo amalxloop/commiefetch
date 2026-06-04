@@ -195,7 +195,12 @@ def _format_memory(mem):
     if not mem:
         return "unknown"
     if isinstance(mem, dict):
-        return f"{mem.get('used', 0)} {mem.get('unit', 'MiB')} / {mem.get('total', 0)} {mem.get('unit', 'MiB')} ({mem.get('percent', 0)}%)"
+        total = mem.get('total', 0)
+        used = mem.get('used', 0)
+        pct = mem.get('percent', 0)
+        if total >= 1024:
+            return f"{used/1024:.1f} GiB / {total/1024:.1f} GiB ({pct}%)"
+        return f"{used} MiB / {total} MiB ({pct}%)"
     return str(mem)
 
 
