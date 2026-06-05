@@ -353,6 +353,25 @@ def get_memory():
                             meminfo[parts[0]] = val
             except Exception:
                 out = run_cmd(["cat", "/proc/meminfo"], timeout=3)
+                if not out:
+                    out = run_cmd(["free", "-m"], timeout=3)
+                    if out:
+                        for line in out.split("\n"):
+                            if line.startswith("Mem:"):
+                                cols = line.split()
+                                if len(cols) >= 3:
+                                    try:
+                                        total = int(cols[1])
+                                        used = int(cols[2])
+                                        return {
+                                            "total": total,
+                                            "used": used,
+                                            "available": total - used,
+                                            "unit": "MiB",
+                                            "percent": round(used / total * 100, 1) if total else 0,
+                                        }
+                                    except Exception:
+                                        pass
                 if out:
                     for line in out.split("\n"):
                         parts = line.split(":")
@@ -362,9 +381,9 @@ def get_memory():
                                 val = int(val.split()[0]) // 1024
                             meminfo[parts[0]] = val
             total = meminfo.get("MemTotal", 0)
-            avail = meminfo.get("MemAvailable", 0)
             if total == 0:
-                return {"total": 0, "used": 0, "unit": "MiB", "percent": 0}
+                return None
+            avail = meminfo.get("MemAvailable", 0)
             if avail == 0:
                 free = meminfo.get("MemFree", 0)
                 buffers = meminfo.get("Buffers", 0)
@@ -485,7 +504,7 @@ def get_disk(path="/"):
         total = usage.total // (1024 * 1024)
         used = usage.used // (1024 * 1024)
         free = usage.free // (1024 * 1024)
-        return {
+        info = {
             "total": total,
             "used": used,
             "free": free,
@@ -493,23 +512,45 @@ def get_disk(path="/"):
             "mount": path,
             "percent": round(used / total * 100, 1) if total else 0,
         }
-    except Exception:
-        if is_termux() and path == "/":
-            out = run_cmd(["df", "-m", path], timeout=5)
-            if out:
-                for line in out.split("\n"):
-                    parts = line.split()
-                    if len(parts) >= 6 and parts[-1] == path:
-                        total = int(parts[1])
-                        used = int(parts[2])
-                        return {
-                            "total": total,
-                            "used": used,
-                            "free": total - used,
+        if is_termux():
+            for p in ["/storage/emulated/0", "/sdcard", "/data/media/0"]:
+                try:
+                    u2 = shutil.disk_usage(p)
+                    t2 = u2.total // (1024 * 1024)
+                    if t2 > info["total"]:
+                        info = {
+                            "total": t2,
+                            "used": u2.used // (1024 * 1024),
+                            "free": u2.free // (1024 * 1024),
                             "unit": "MiB",
-                            "mount": path,
-                            "percent": round(used / total * 100, 1) if total else 0,
+                            "mount": p,
+                            "percent": round(u2.used // (1024 * 1024) / t2 * 100, 1) if t2 else 0,
                         }
+                except Exception:
+                    pass
+        return info
+    except Exception:
+        if is_termux():
+            for p in [path, "/storage/emulated/0", "/sdcard", "/data/media/0"]:
+                out = run_cmd(["df", "-m", p], timeout=5)
+                if out:
+                    for line in out.split("\n"):
+                        parts = line.split()
+                        if len(parts) >= 6 and parts[-1] == p:
+                            try:
+                                total = int(parts[1])
+                                if total > 0:
+                                    used = int(parts[2])
+                                    return {
+                                        "total": total,
+                                        "used": used,
+                                        "free": total - used,
+                                        "unit": "MiB",
+                                        "mount": p,
+                                        "percent": round(used / total * 100, 1) if total else 0,
+                                    }
+                            except Exception:
+                                pass
         return None
 
 
@@ -540,6 +581,16 @@ def get_disks():
                         "mount": "/",
                         "info": root,
                     })
+                for p in ["/storage/emulated/0", "/sdcard", "/data/media/0"]:
+                    info = get_disk(p)
+                    if info and info["total"] >= 1024:
+                        seen = any(d["mount"] == p for d in disks)
+                        if not seen:
+                            disks.append({
+                                "device": "internal",
+                                "mount": p,
+                                "info": info,
+                            })
             return disks[:4]
         except Exception:
             pass
