@@ -337,6 +337,34 @@ def get_gpu():
         return "unknown"
 
 
+def _get_dumpsys_memory():
+    """Parse 'dumpsys meminfo' output on Android."""
+    try:
+        out = run_cmd(["dumpsys", "meminfo"], timeout=5)
+        if not out:
+            out = run_cmd(["/system/bin/dumpsys", "meminfo"], timeout=5)
+        if not out:
+            return None
+        for line in out.split("\n"):
+            line = line.strip()
+            if "Total RAM:" in line:
+                val = line.split(":")[-1].strip()
+                val = val.replace(",", "").replace(" ", "")
+                if val.endswith("kB"):
+                    total_mb = int(val[:-2]) // 1024
+                elif val.endswith("MB"):
+                    total_mb = int(val[:-2])
+                elif val.endswith("GB"):
+                    total_mb = int(float(val[:-2]) * 1024)
+                else:
+                    total_mb = int(val) // 1024
+                return {"total": total_mb, "used": 0, "available": 0,
+                        "unit": "MiB", "percent": 0}
+        return None
+    except Exception:
+        return None
+
+
 def _get_sysinfo_memory():
     try:
         import ctypes
@@ -368,6 +396,8 @@ def _get_sysinfo_memory():
         totalram = fields[3]
         freeram = fields[4]
         total_mb = totalram * mem_unit // (1024 * 1024)
+        if total_mb == 0:
+            return None
         free_mb = freeram * mem_unit // (1024 * 1024)
         used_mb = total_mb - free_mb
         return {
@@ -407,14 +437,15 @@ def get_memory():
                                 if len(cols) >= 3:
                                     try:
                                         total = int(cols[1])
-                                        used = int(cols[2])
-                                        return {
-                                            "total": total,
-                                            "used": used,
-                                            "available": total - used,
-                                            "unit": "MiB",
-                                            "percent": round(used / total * 100, 1) if total else 0,
-                                        }
+                                        if total > 0:
+                                            used = int(cols[2])
+                                            return {
+                                                "total": total,
+                                                "used": used,
+                                                "available": total - used,
+                                                "unit": "MiB",
+                                                "percent": round(used / total * 100, 1) if total else 0,
+                                            }
                                     except Exception:
                                         pass
                 if out:
@@ -428,7 +459,10 @@ def get_memory():
             total = meminfo.get("MemTotal", 0)
             if total == 0:
                 result = _get_sysinfo_memory()
-                if result:
+                if result and result["total"] > 0:
+                    return result
+                result = _get_dumpsys_memory()
+                if result and result["total"] > 0:
                     return result
                 return None
             avail = meminfo.get("MemAvailable", 0)
