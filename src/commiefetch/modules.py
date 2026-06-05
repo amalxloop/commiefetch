@@ -7,6 +7,7 @@ import shutil
 import socket
 import pwd
 import grp
+import struct
 from pathlib import Path
 
 from .colors import NO_COLOR
@@ -336,6 +337,50 @@ def get_gpu():
         return "unknown"
 
 
+def _get_sysinfo_memory():
+    try:
+        import ctypes
+        import platform as _plat
+        libc = None
+        for name in ["libc.so.6", "libc.so"]:
+            try:
+                libc = ctypes.CDLL(name)
+                break
+            except OSError:
+                continue
+        if libc is None:
+            return None
+
+        buf = ctypes.create_string_buffer(200)
+        ret = libc.sysinfo(buf)
+        if ret != 0:
+            return None
+        data = buf.raw
+
+        is_64 = _plat.machine() in ("aarch64", "x86_64", "amd64")
+        if is_64:
+            fmt = "<q3Q7QH2QI"
+        else:
+            fmt = "<i3I7IH2II8x"
+
+        fields = struct.unpack_from(fmt, data)
+        mem_unit = fields[-1] or 1
+        totalram = fields[3]
+        freeram = fields[4]
+        total_mb = totalram * mem_unit // (1024 * 1024)
+        free_mb = freeram * mem_unit // (1024 * 1024)
+        used_mb = total_mb - free_mb
+        return {
+            "total": total_mb,
+            "used": used_mb,
+            "available": free_mb,
+            "unit": "MiB",
+            "percent": round(used_mb / total_mb * 100, 1) if total_mb else 0,
+        }
+    except Exception:
+        return None
+
+
 @cached("memory", 5)
 def get_memory():
     try:
@@ -382,6 +427,9 @@ def get_memory():
                             meminfo[parts[0]] = val
             total = meminfo.get("MemTotal", 0)
             if total == 0:
+                result = _get_sysinfo_memory()
+                if result:
+                    return result
                 return None
             avail = meminfo.get("MemAvailable", 0)
             if avail == 0:
