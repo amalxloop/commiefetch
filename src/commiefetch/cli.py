@@ -187,7 +187,10 @@ def get_module_value(name):
     }
     func = mappers.get(name)
     if func:
-        return func()
+        try:
+            return func()
+        except Exception:
+            return None
     return None
 
 

@@ -341,18 +341,39 @@ def get_memory():
     try:
         system = platform.system()
         if system == "Linux":
-            with open("/proc/meminfo") as f:
-                meminfo = {}
-                for line in f:
-                    parts = line.split(":")
-                    if len(parts) == 2:
-                        val = parts[1].strip()
-                        if val.endswith(" kB"):
-                            val = int(val.split()[0]) // 1024
-                        meminfo[parts[0]] = val
+            meminfo = {}
+            try:
+                with open("/proc/meminfo") as f:
+                    for line in f:
+                        parts = line.split(":")
+                        if len(parts) == 2:
+                            val = parts[1].strip()
+                            if val.endswith(" kB"):
+                                val = int(val.split()[0]) // 1024
+                            meminfo[parts[0]] = val
+            except Exception:
+                out = run_cmd(["cat", "/proc/meminfo"], timeout=3)
+                if out:
+                    for line in out.split("\n"):
+                        parts = line.split(":")
+                        if len(parts) == 2:
+                            val = parts[1].strip()
+                            if val.endswith(" kB"):
+                                val = int(val.split()[0]) // 1024
+                            meminfo[parts[0]] = val
             total = meminfo.get("MemTotal", 0)
             avail = meminfo.get("MemAvailable", 0)
+            if total == 0:
+                return {"total": 0, "used": 0, "unit": "MiB", "percent": 0}
+            if avail == 0:
+                free = meminfo.get("MemFree", 0)
+                buffers = meminfo.get("Buffers", 0)
+                cached = meminfo.get("Cached", 0)
+                slab = meminfo.get("SReclaimable", 0)
+                avail = free + buffers + cached + slab
             used = total - avail
+            if used < 0:
+                used = 0
             return {
                 "total": total,
                 "used": used,
@@ -474,11 +495,11 @@ def get_disk(path="/"):
         }
     except Exception:
         if is_termux() and path == "/":
-            out = run_cmd(["df", "-m", "/"], timeout=5)
+            out = run_cmd(["df", "-m", path], timeout=5)
             if out:
                 for line in out.split("\n"):
                     parts = line.split()
-                    if len(parts) >= 6 and parts[0] == "/":
+                    if len(parts) >= 6 and parts[-1] == path:
                         total = int(parts[1])
                         used = int(parts[2])
                         return {
@@ -486,7 +507,7 @@ def get_disk(path="/"):
                             "used": used,
                             "free": total - used,
                             "unit": "MiB",
-                            "mount": "/",
+                            "mount": path,
                             "percent": round(used / total * 100, 1) if total else 0,
                         }
         return None
