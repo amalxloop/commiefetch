@@ -411,66 +411,90 @@ def _get_sysinfo_memory():
         return None
 
 
+def _parse_meminfo_value(val):
+    val = val.strip().replace(",", "")
+    if val.endswith(" kB"):
+        return int(val.split()[0]) // 1024
+    if val.endswith(" MB"):
+        return int(val.split()[0])
+    if val.endswith(" GB"):
+        return int(float(val.split()[0]) * 1024)
+    if val.endswith(" KB"):
+        return int(val.split()[0]) // 1024
+    if val.endswith(" mb"):
+        return int(val.split()[0])
+    if val.endswith(" gb"):
+        return int(float(val.split()[0]) * 1024)
+    try:
+        return int(val)
+    except ValueError:
+        try:
+            return int(float(val))
+        except ValueError:
+            return 0
+
+
 @cached("memory", 5)
 def get_memory():
     try:
         system = platform.system()
         if system == "Linux":
             meminfo = {}
+            raw = None
             try:
                 with open("/proc/meminfo") as f:
-                    for line in f:
-                        parts = line.split(":")
-                        if len(parts) == 2:
-                            val = parts[1].strip()
-                            if val.endswith(" kB"):
-                                val = int(val.split()[0]) // 1024
-                            meminfo[parts[0]] = val
+                    raw = f.read()
             except Exception:
-                out = run_cmd(["cat", "/proc/meminfo"], timeout=3)
-                if not out:
-                    out = run_cmd(["free", "-m"], timeout=3)
-                    if out:
-                        for line in out.split("\n"):
-                            if line.startswith("Mem:"):
-                                cols = line.split()
-                                if len(cols) >= 3:
-                                    try:
-                                        total = int(cols[1])
-                                        if total > 0:
-                                            used = int(cols[2])
-                                            return {
-                                                "total": total,
-                                                "used": used,
-                                                "available": total - used,
-                                                "unit": "MiB",
-                                                "percent": round(used / total * 100, 1) if total else 0,
-                                            }
-                                    except Exception:
-                                        pass
-                if out:
-                    for line in out.split("\n"):
-                        parts = line.split(":")
-                        if len(parts) == 2:
-                            val = parts[1].strip()
-                            if val.endswith(" kB"):
-                                val = int(val.split()[0]) // 1024
-                            meminfo[parts[0]] = val
+                raw = run_cmd(["cat", "/proc/meminfo"], timeout=3)
+            if raw:
+                for line in raw.split("\n"):
+                    parts = line.split(":")
+                    if len(parts) == 2:
+                        meminfo[parts[0]] = _parse_meminfo_value(parts[1])
             total = meminfo.get("MemTotal", 0)
+            if not isinstance(total, (int, float)) or total <= 0:
+                total = 0
             if total == 0:
                 result = _get_sysinfo_memory()
-                if result and result["total"] > 0:
+                if result and result.get("total", 0) > 0:
                     return result
                 result = _get_dumpsys_memory()
-                if result and result["total"] > 0:
+                if result and result.get("total", 0) > 0:
                     return result
+                free_out = run_cmd(["free", "-m"], timeout=3)
+                if free_out:
+                    for line in free_out.split("\n"):
+                        if line.startswith("Mem:"):
+                            cols = line.split()
+                            if len(cols) >= 3:
+                                try:
+                                    t = int(cols[1])
+                                    if t > 0:
+                                        u = int(cols[2])
+                                        return {
+                                            "total": t, "used": u,
+                                            "available": t - u, "unit": "MiB",
+                                            "percent": round(u / t * 100, 1),
+                                        }
+                                except Exception:
+                                    pass
                 return None
             avail = meminfo.get("MemAvailable", 0)
+            if not isinstance(avail, (int, float)):
+                avail = 0
             if avail == 0:
                 free = meminfo.get("MemFree", 0)
                 buffers = meminfo.get("Buffers", 0)
                 cached = meminfo.get("Cached", 0)
                 slab = meminfo.get("SReclaimable", 0)
+                if not isinstance(free, (int, float)):
+                    free = 0
+                if not isinstance(buffers, (int, float)):
+                    buffers = 0
+                if not isinstance(cached, (int, float)):
+                    cached = 0
+                if not isinstance(slab, (int, float)):
+                    slab = 0
                 avail = free + buffers + cached + slab
             used = total - avail
             if used < 0:
@@ -547,10 +571,10 @@ def get_memory():
                     "unit": "MiB",
                     "percent": round(used_mb / total_mb * 100, 1) if total_mb else 0,
                 }
-            return {"total": total, "used": 0, "unit": "MiB", "percent": 0}
-        return {"total": 0, "used": 0, "unit": "MiB", "percent": 0}
+            return None
+        return None
     except Exception:
-        return {"total": 0, "used": 0, "unit": "MiB", "percent": 0}
+        return None
 
 
 @cached("swap", 30)
