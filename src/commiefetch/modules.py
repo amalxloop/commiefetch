@@ -440,19 +440,27 @@ def get_memory():
         system = platform.system()
         if system == "Linux":
             meminfo = {}
-            raw = None
             try:
                 with open("/proc/meminfo") as f:
-                    raw = f.read()
+                    for line in f:
+                        parts = line.split(":")
+                        if len(parts) == 2:
+                            val = parts[1].strip()
+                            if val.endswith(" kB"):
+                                val = int(val.split()[0]) // 1024
+                            meminfo[parts[0]] = val
             except Exception:
-                raw = run_cmd(["cat", "/proc/meminfo"], timeout=3)
-            if raw:
-                for line in raw.split("\n"):
-                    parts = line.split(":")
-                    if len(parts) == 2:
-                        meminfo[parts[0]] = _parse_meminfo_value(parts[1])
+                out = run_cmd(["cat", "/proc/meminfo"], timeout=3)
+                if out:
+                    for line in out.split("\n"):
+                        parts = line.split(":")
+                        if len(parts) == 2:
+                            val = parts[1].strip()
+                            if val.endswith(" kB"):
+                                val = int(val.split()[0]) // 1024
+                            meminfo[parts[0]] = val
             total = meminfo.get("MemTotal", 0)
-            if not isinstance(total, (int, float)) or total <= 0:
+            if not isinstance(total, (int, float)):
                 total = 0
             if total == 0:
                 result = _get_sysinfo_memory()
@@ -467,17 +475,14 @@ def get_memory():
                         if line.startswith("Mem:"):
                             cols = line.split()
                             if len(cols) >= 3:
-                                try:
-                                    t = int(cols[1])
-                                    if t > 0:
-                                        u = int(cols[2])
-                                        return {
-                                            "total": t, "used": u,
-                                            "available": t - u, "unit": "MiB",
-                                            "percent": round(u / t * 100, 1),
-                                        }
-                                except Exception:
-                                    pass
+                                t = int(cols[1])
+                                if t > 0:
+                                    u = int(cols[2])
+                                    return {
+                                        "total": t, "used": u,
+                                        "available": t - u, "unit": "MiB",
+                                        "percent": round(u / t * 100, 1),
+                                    }
                 return None
             avail = meminfo.get("MemAvailable", 0)
             if not isinstance(avail, (int, float)):
